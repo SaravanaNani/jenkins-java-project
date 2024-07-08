@@ -31,7 +31,7 @@ pipeline {
                 '''                
             }
         }
-        stage('Rename and Upload WAR') {
+        stage('Upload Artifact') {
             steps {
                 script {
                     // Rename the WAR file
@@ -52,7 +52,7 @@ pipeline {
             }
         }
 
-        stage('Confirm and Get Private IP') {
+        stage('Confirmation') {
             steps {
                 script {
                     input message: 'Are you sure you want to proceed with the deployment?', ok: 'Yes'
@@ -68,7 +68,7 @@ pipeline {
                     }
 
                     env.PRIVATE_IP = sh(script: '''
-                        gcloud compute instances list --filter="labels.adq-ubuntudesktop=env" --format="value(networkInterfaces[0].networkIP)" --limit=1
+                        gcloud compute instances list --filter="labels.adq_ubuntudesktop=app" --format="value(networkInterfaces[0].networkIP)" --limit=1
                     ''', returnStdout: true).trim()
 
                     echo "Private IP: ${env.PRIVATE_IP}"
@@ -76,7 +76,7 @@ pipeline {
             }
         }
 
-        stage('Deploy and Restart Tomcat') {
+        stage('Deployment') {
             steps {
                 script {
                     sh '''
@@ -88,17 +88,17 @@ pipeline {
                     ls -al /var/lib/jenkins/workspace/adq-java-app/target/
                     
                     # Shutdown Tomcat
-                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} '/root/apache-tomcat-9.0.89/bin/shutdown.sh'
+                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} '/root/apache-tomcat-10.1.25/bin/shutdown.sh'
 
                     # Remove old WAR files and directories
-                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} "find /root/apache-tomcat-9.0.89/webapps/ -type d -name 'JAVA_APP-1.2.*' -exec rm -rf {} +"
-                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} "find /root/apache-tomcat-9.0.89/webapps/ -type f -name 'JAVA_APP-1.2*.war' -exec rm -f {} +"
+                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} "find /root/apache-tomcat-10.1.25/webapps/ -type d -name 'JAVA_APP-1.2.*' -exec rm -rf {} +"
+                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} "find /root/apache-tomcat-10.1.25/webapps/ -type f -name 'JAVA_APP-1.2*.war' -exec rm -f {} +"
 
                     # Deploy the new WAR file
-                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa /var/lib/jenkins/workspace/adq-java-app/target/JAVA_APP-1.2.${BUILD_NUMBER}.war root@${PRIVATE_IP}:/root/apache-tomcat-9.0.89/webapps/
+                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa /var/lib/jenkins/workspace/adq-java-app/target/JAVA_APP-1.2.${BUILD_NUMBER}.war root@${PRIVATE_IP}:/root/apache-tomcat-10.1.25/webapps/
 
                     # Start Tomcat
-                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} '/root/apache-tomcat-9.0.89/bin/startup.sh'
+                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} '/root/apache-tomcat-10.1.25/bin/startup.sh'
                     '''
                 }
             }
