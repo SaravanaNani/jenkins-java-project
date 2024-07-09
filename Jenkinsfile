@@ -119,4 +119,54 @@ pipeline {
 
                     # Remove old WAR files and directories
                     ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} "find ${TARGET_HOST_PATH}/webapps/ -type d -name 'JAVA_APP-1.2.*' -exec rm -rf {} +"
-                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} "find ${TARGET_HOST_PATH}/webapps/ -type f -
+                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} "find ${TARGET_HOST_PATH}/webapps/ -type f -name 'JAVA_APP-1.2*.war' -exec rm -f {} +"
+
+                    # Deploy the new WAR file
+                    scp -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa ${WORKSPACE_DIR}/target/JAVA_APP-1.2.${BUILD_NUMBER}.war root@${PRIVATE_IP}:${TARGET_HOST_PATH}/webapps/
+
+                    # Start Tomcat
+                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/id_rsa root@${PRIVATE_IP} "${TARGET_HOST_PATH}/bin/startup.sh"
+                    '''
+                }
+            }
+        }
+
+        stage('Update pom.xml Version') {
+            steps {
+                script {
+                    // Clone the repository
+                    sh 'git clone https://github.com/SaravanaNani/jenkins-java-project.git'
+                    
+                    // Update the pom.xml with the new version
+                    sh '''
+                    cd jenkins-java-project
+                    git fetch --all
+                    git checkout ${BRANCH_NAME}
+                    # Debug before modification
+                    echo "Before modification:"
+                    sed -n '7p' pom.xml  # Print line 7 before modification
+
+                    # Update line 7 with the new version
+                    perl -i -pe 'if ($. == 7) { s|<version>.*?</version>|<version>1.2.'${BUILD_NUMBER}'</version>| }' pom.xml
+
+                    # Debug after modification
+                    echo "After modification:"
+                    sed -n '7p' pom.xml  # Print line 7 after modification
+                    git config user.name "SaravanaNani"
+                    git config user.email "saravana08052002@gmail.com"
+                    git add pom.xml
+                    git commit -m "Update version to 1.2.${BUILD_NUMBER}"
+                    '''
+                    
+                    // Push the changes using the stored credentials
+                    withCredentials([string(credentialsId: 'github-pat', variable: 'GITHUB_PAT')]) {
+                        sh '''
+                        cd jenkins-java-project
+                        git remote set-url origin https://$GITHUB_PAT@github.com/SaravanaNani/jenkins-java-project.git
+                        git push origin ${BRANCH_NAME}
+                        '''
+                    }
+                }
+            }
+        }    
+    }
