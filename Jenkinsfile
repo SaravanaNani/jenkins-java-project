@@ -12,7 +12,9 @@ pipeline {
         ZONE = 'us-central1-c'
         INSTANCE_NAME = 'get-ubuntudesktop'
         TARGET_HOST_PATH = '/opt/tomcat/apache-tomcat-10.1.25'
-    }
+        SONARQUBE_SERVER = 'SonarQube' // Name configured in Jenkins for SonarQube server
+        SONARQUBE_PROJECT_KEY = 'adq-java-app'
+    }    
 
     stages {
         stage('Checkout') {
@@ -37,6 +39,15 @@ pipeline {
                 '''                
             }
         }
+         stage('SonarQube Analysis') {
+            steps {
+                script {
+                    withSonarQubeEnv('SonarQube') {
+                        sh 'mvn sonar:sonar -Dsonar.projectKey=${SONARQUBE_PROJECT_KEY} -Dsonar.login=${SONAR_TOKEN}'
+                    }
+                }
+            }
+        }       
 
         stage('Upload Artifact') {
             steps {
